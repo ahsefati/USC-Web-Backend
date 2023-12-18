@@ -8,9 +8,69 @@ import Costs from "../models/costs.js";
 import Jobs from "../models/jobs.js";
 import Fields from "../models/fields.js";
 import Coins from "../models/coins.js";
+import User from "../models/user.js"
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
+
+
+export const addCash = async (req, res) => {
+    if (!req.userId) return res.status(401).json({message: 'Unauthenticated!'})
+    const { valueToDeposit } = req.body
+
+    try {
+        const updatedUser = await User.findByIdAndUpdate(
+            req.userId,
+            { $inc: { cashBalance: valueToDeposit } }, // Use $inc to increment the balance
+            { new: true } // Returns the updated document
+        )
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found!" })
+        }
+
+        res.status(200).json({ message: "Deposit was successful!" })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: "Something went wrong!" })
+    }
+}
+
+export const withdrawCash = async (req, res) => {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthenticated' })
+    
+    const { valueToWithdraw } = req.body
+    const withdrawalAmount = parseFloat(valueToWithdraw);
+
+    // Optional: Check for valid number
+    if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+        return res.status(400).json({ message: "Invalid withdrawal amount" });
+    }
+
+    try {
+        const currentUser = await User.findById(req.userId);
+        if (!currentUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if the user has enough balance
+        if (currentUser.cashBalance < withdrawalAmount) {
+            return res.status(400).json({ message: "Insufficient balance" });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.userId,
+            { $inc: { cashBalance: -withdrawalAmount } },
+            { new: true }
+        );
+
+        console.log("Withdrawal successful!");
+        res.status(200).json({ message: "Cash withdrawn successfully", updatedUser })
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Something went wrong" });
+    }
+}
 
 export const getLiveCoinsData = async (req, res) => {
     try {

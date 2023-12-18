@@ -1,11 +1,14 @@
 import express from 'express';
 
-import {getTool, getTools, getUniversities, likeATool, getCountries, getCosts, getJobs, searchJobsByNJ, searchFieldsByNF, getLiveCoinsData, getLiveCoinData } from '../controllers/tools.js';
+import {getTool, getTools, getUniversities, likeATool, getCountries, getCosts, getJobs, searchJobsByNJ, searchFieldsByNF, getLiveCoinsData, getLiveCoinData, addCash, withdrawCash } from '../controllers/tools.js';
 
 import auth from '../middleware/auth.js';
 
 const router = express.Router();
 
+
+router.patch('/addcash', auth, addCash)
+router.patch('/withdrawcash', auth, withdrawCash)
 router.get('/livecoinsdata', getLiveCoinsData)
 router.post('/livecoindata', getLiveCoinData)
 

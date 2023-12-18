@@ -34,6 +34,7 @@ const userSchema = mongoose.Schema({
         type: Array,
         default: []
     },
+    cashBalance: {type: mongoose.Types.Decimal128, default: 0.0},
     wallet: {
         type: [walletItemSchema],
         default: [
@@ -71,6 +72,7 @@ const userSchema = mongoose.Schema({
             },
         ]
     }
+
 })
 
 const user = mongoose.model('User', userSchema)
