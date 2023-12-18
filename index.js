@@ -6,6 +6,10 @@ import dotenv from 'dotenv'
 import postRoutes from './routes/posts.js'
 import userRoutes from './routes/users.js'
 import toolRoutes from './routes/tools.js'
+import Coins from "./models/coins.js";
+
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 dotenv.config()
 const app = express();
@@ -30,4 +34,39 @@ mongoose.connect( CONNECTION_URL, {useNewUrlParser: true, useUnifiedTopology: tr
         .then(()=> app.listen(PORT, () => console.log("Server is running.")))
         .catch((err) => console.log(err.message))
 
+
+const updateCoinsDB = () => {
+        const sdk = require('api')('@coinstatsopenapi/v1.0#8fc3kgx93i1locyjj6r');
+        sdk.auth('YcvhJI87P+Q3tB2kz/QpOM1rgp38azdun8RRdh/P7lY=');
+        sdk.coinController_coinList({limit: '8'})
+        .then(({ data }) => {
+                data.result.forEach(coin => {
+                const updateData = {
+                        price: coin.price,
+                        priceChange1h: coin.priceChange1h,
+                        priceChange1d: coin.priceChange1d,
+                        priceChange1w: coin.priceChange1w,
+                        volume: coin.volume,
+                        marketCap: coin.marketCap,
+                        supply: coin.availableSupply,
+                        lastupdated: new Date() // Current date and time
+                };
+
+                // Save to MongoDB
+                Coins.findOneAndUpdate(
+                        { id: coin.id }, // Search criterion
+                        updateData, // Data to update
+                        { upsert: true, new: true }, // Options: upsert and return new document
+                        (err, doc) => {
+                                if (err) {
+                                        console.error('Error updating coin in database:', err);
+                                }
+                        }
+                );
+                });
+        })
+        .catch(err => console.error(err));
+}
+
+// setInterval(updateCoinsDB, 1000);
     

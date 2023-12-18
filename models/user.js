@@ -1,5 +1,14 @@
 import mongoose from "mongoose";
 
+
+const walletItemSchema = new mongoose.Schema({
+    id: String,
+    balance: {
+      type: mongoose.Types.Decimal128,
+      default: 0.0
+    }
+});
+
 const userSchema = mongoose.Schema({
     name: {type: String, required: true},
     email: {type: String, required: true},
@@ -24,6 +33,43 @@ const userSchema = mongoose.Schema({
     savedTools: {
         type: Array,
         default: []
+    },
+    wallet: {
+        type: [walletItemSchema],
+        default: [
+            {
+                id:'bitcoin',
+                balance: 0.0
+            },
+            {
+                id:'ethereum',
+                balance: 0.0
+            },
+            {
+                id:'tether',
+                balance: 0.0
+            },
+            {
+                id:'binance-coin',
+                balance: 0.0
+            },
+            {
+                id:'ripple',
+                balance: 0.0
+            },
+            {
+                id:'solana',
+                balance: 0.0
+            },
+            {
+                id:'usd-coin',
+                balance: 0.0
+            },
+            {
+                id:'cardano',
+                balance: 0.0
+            },
+        ]
     }
 })
 

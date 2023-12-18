@@ -7,6 +7,45 @@ import Cities from "../models/cities.js";
 import Costs from "../models/costs.js";
 import Jobs from "../models/jobs.js";
 import Fields from "../models/fields.js";
+import Coins from "../models/coins.js";
+
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+export const getLiveCoinsData = async (req, res) => {
+    try {
+        Coins.find({}, (err, coins) => {
+            if (err) {
+                res.status(500).send(err);
+            } else {
+                res.status(200).json(coins);
+            }
+        });
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+export const getLiveCoinData = async (req, res) => {
+    try {
+        const {id, period} = req.body
+        console.log(id)
+        console.log(period)
+        const sdk = require('api')('@coinstatsopenapi/v1.0#8fc3kgx93i1locyjj6r');
+
+        sdk.auth('YcvhJI87P+Q3tB2kz/QpOM1rgp38azdun8RRdh/P7lY=');
+        sdk.coinController_coinChart({period: period, coinId: id})
+        .then(({ data }) => {
+            res.status(200).json(data);
+        })
+        .catch(err => console.error(err));
+
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+
 
 export const getTool = async (req, res) => {
     const { id } = req.params

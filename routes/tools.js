@@ -1,10 +1,14 @@
 import express from 'express';
 
-import {getTool, getTools, getUniversities, likeATool, getCountries, getCosts, getJobs, searchJobsByNJ, searchFieldsByNF } from '../controllers/tools.js';
+import {getTool, getTools, getUniversities, likeATool, getCountries, getCosts, getJobs, searchJobsByNJ, searchFieldsByNF, getLiveCoinsData, getLiveCoinData } from '../controllers/tools.js';
 
 import auth from '../middleware/auth.js';
 
 const router = express.Router();
+
+router.get('/livecoinsdata', getLiveCoinsData)
+router.post('/livecoindata', getLiveCoinData)
+
 
 
 // University Tool Functionalities
