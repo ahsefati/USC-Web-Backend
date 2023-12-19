@@ -1,21 +1,20 @@
 import mongoose from "mongoose";
 
-const citySchema = mongoose.Schema({
-    name: String,
-    country: Number,
-    QofLife: Number,
-    PPI: Number,
-    Safety: Number,
-    HCI: Number,
-    CLI: Number,
-    PPtoIR: Number,
-    TCTI: Number,
-    PI: Number,
-    CI: Number,
-    RI: Number
-})
+const transactionsSchema = new mongoose.Schema({
+    userId: {
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true 
+    },
+    amount: mongoose.Schema.Types.Decimal128,
+    description: String, 
+    happeningDate: {
+        type: Date,
+        default: Date.now 
+    }
+});
 
 
-const Cities = mongoose.model('Cities', citySchema)
+const Transactions = mongoose.model('Transactions', transactionsSchema)
 
-export default Cities
+export default Transactions

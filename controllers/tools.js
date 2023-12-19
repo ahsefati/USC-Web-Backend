@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import jwt from 'jsonwebtoken'
 
 import Tool from "../models/tool.js"
 import Universities from "../models/universities.js";
@@ -9,10 +10,160 @@ import Jobs from "../models/jobs.js";
 import Fields from "../models/fields.js";
 import Coins from "../models/coins.js";
 import User from "../models/user.js"
+import Transactions from "../models/transactions.js"
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
+export const getTransactions = async (req, res) => {
+    try{
+        if (!req.userId) return res.status(401).json({ message: 'Unauthenticated' })
+
+        const transactions = await Transactions.find({userId: req.userId})
+        if (transactions){
+            res.status(200).json({transactions: transactions})
+        } else{
+            res.status(200).json({transactions: []})
+        }
+    } catch (error){
+        res.status(404).json({message:error.message})
+    }
+}
+
+export const buyCoin = async (req, res) => {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthenticated' })
+    
+    const { valueToHandleCoin, idToHandleCoin } = req.body
+    const withdrawalAmount = parseFloat(valueToHandleCoin);
+
+    // Optional: Check for valid number
+    if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+        return res.status(400).json({ message: "Invalid withdrawal amount" });
+    }
+
+    try {
+        const currentUser = await User.findById(req.userId);
+        if (!currentUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if the user has enough balance
+        if (currentUser.cashBalance < withdrawalAmount) {
+            return res.status(400).json({ message: "Insufficient balance" });
+        }
+
+        // Doing the job:
+        const update = { $inc: { cashBalance: -withdrawalAmount } }
+        const selectedCoin = await Coins.findOne({id:idToHandleCoin})
+        console.log(selectedCoin.price) 
+        update.$inc[`wallet.$.balance`] = parseFloat(withdrawalAmount/selectedCoin.price)
+
+        const updatedUser = await User.findOneAndUpdate(
+            { 
+                _id: req.userId, 
+                "wallet.id": idToHandleCoin // Filter to match the specific coin in the wallet
+            },
+            update,
+            { 
+                new: true,
+                arrayFilters: [{ "elem.id": idToHandleCoin }] // Array filter for the specific coin
+            }
+        );
+    
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found or coin ID not found in wallet" });
+        }
+
+        // Create a new transaction record
+        const newTransaction = new Transactions({
+            userId: req.userId,
+            amount: withdrawalAmount,
+            description: 'Buy a coin: ' + selectedCoin.id , // You can customize this description
+            happeningDate: new Date() // Or set default in the schema
+        })
+
+        // Save the transaction
+        await newTransaction.save();
+
+        // Update user's info
+        const newUserInfo = await User.findById(req.userId)
+        const token = jwt.sign({email: newUserInfo.email, id: req.userId}, process.env.SECRET_KEY_JWT, {expiresIn:"10d"})
+
+        res.status(200).json({result: newUserInfo, token: token})
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Something went wrong" });
+    }
+}
+
+export const sellCoin = async (req, res) => {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthenticated' })
+    
+    const { valueToHandleCoin, idToHandleCoin } = req.body
+    const withdrawalAmount = parseFloat(valueToHandleCoin);
+
+    // Optional: Check for valid number
+    if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+        return res.status(400).json({ message: "Invalid withdrawal amount" });
+    }
+
+    try {
+        const currentUser = await User.findById(req.userId);
+        if (!currentUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if the user has enough balance
+        if (currentUser.wallet.filter(coin=>coin.id===idToHandleCoin)[0].balance < withdrawalAmount) {
+            return res.status(400).json({ message: "Insufficient balance!" });
+        }
+
+        const selectedCoin = await Coins.findOne({id: idToHandleCoin})
+        const depositAmount = withdrawalAmount * selectedCoin.price
+
+        // Doing the job:
+        const update = { $inc: { cashBalance: depositAmount } } 
+        update.$inc[`wallet.$.balance`] = -1 * parseFloat(withdrawalAmount)
+
+        const updatedUser = await User.findOneAndUpdate(
+            { 
+                _id: req.userId, 
+                "wallet.id": idToHandleCoin // Filter to match the specific coin in the wallet
+            },
+            update,
+            { 
+                new: true,
+                arrayFilters: [{ "elem.id": idToHandleCoin }] // Array filter for the specific coin
+            }
+        );
+    
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found or coin ID not found in wallet" });
+        }
+
+        // Create a new transaction record
+        const newTransaction = new Transactions({
+            userId: req.userId,
+            amount: withdrawalAmount,
+            description: 'Sell a coin: ' + selectedCoin.id , 
+            happeningDate: new Date()
+        })
+
+        // Save the transaction
+        await newTransaction.save();
+
+        // Update user's info
+        const newUserInfo = await User.findById(req.userId)
+        const token = jwt.sign({email: newUserInfo.email, id: req.userId}, process.env.SECRET_KEY_JWT, {expiresIn:"10d"})
+
+        res.status(200).json({result: newUserInfo, token: token})
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Something went wrong" });
+    }
+}
 
 export const addCash = async (req, res) => {
     if (!req.userId) return res.status(401).json({message: 'Unauthenticated!'})
@@ -29,7 +180,23 @@ export const addCash = async (req, res) => {
             return res.status(404).json({ message: "User not found!" })
         }
 
-        res.status(200).json({ message: "Deposit was successful!" })
+        // Create a new transaction record
+        const newTransaction = new Transactions({
+            userId: req.userId,
+            amount: valueToDeposit,
+            description: 'Deposit Money.', // You can customize this description
+            happeningDate: new Date() // Or set default in the schema
+        })
+
+        // Save the transaction
+        await newTransaction.save();
+
+        // update user's info
+        const newUserInfo = await User.findById(req.userId)
+        const token = jwt.sign({email: newUserInfo.email, id: req.userId}, process.env.SECRET_KEY_JWT, {expiresIn:"10d"})
+
+        res.status(200).json({result: newUserInfo, token: token})
+
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: "Something went wrong!" })
@@ -64,8 +231,23 @@ export const withdrawCash = async (req, res) => {
             { new: true }
         );
 
-        console.log("Withdrawal successful!");
-        res.status(200).json({ message: "Cash withdrawn successfully", updatedUser })
+        // Create a new transaction record
+        const newTransaction = new Transactions({
+            userId: req.userId,
+            amount: withdrawalAmount,
+            description: 'Withdraw Money.', // You can customize this description
+            happeningDate: new Date() // Or set default in the schema
+        })
+
+        // Save the transaction
+        await newTransaction.save();
+
+        // Update user's info
+        const newUserInfo = await User.findById(req.userId)
+        const token = jwt.sign({email: newUserInfo.email, id: req.userId}, process.env.SECRET_KEY_JWT, {expiresIn:"10d"})
+
+        res.status(200).json({result: newUserInfo, token: token})
+
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: "Something went wrong" });
