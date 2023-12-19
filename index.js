@@ -68,5 +68,5 @@ const updateCoinsDB = () => {
         .catch(err => console.error(err));
 }
 
-// setInterval(updateCoinsDB, 1000);
+setInterval(updateCoinsDB, 2000);
     
