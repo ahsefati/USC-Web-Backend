@@ -34,45 +34,6 @@ const userSchema = mongoose.Schema({
         type: Array,
         default: []
     },
-    cashBalance: {type: mongoose.Types.Decimal128, default: 0.0},
-    wallet: {
-        type: [walletItemSchema],
-        default: [
-            {
-                id:'bitcoin',
-                balance: 0.0
-            },
-            {
-                id:'ethereum',
-                balance: 0.0
-            },
-            {
-                id:'tether',
-                balance: 0.0
-            },
-            {
-                id:'binance-coin',
-                balance: 0.0
-            },
-            {
-                id:'ripple',
-                balance: 0.0
-            },
-            {
-                id:'solana',
-                balance: 0.0
-            },
-            {
-                id:'usd-coin',
-                balance: 0.0
-            },
-            {
-                id:'cardano',
-                balance: 0.0
-            },
-        ]
-    }
-
 })
 
 const user = mongoose.model('User', userSchema)
