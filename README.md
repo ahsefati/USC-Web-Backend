@@ -1,1 +1,1 @@
-# KoochServer
+# USC Research - Web Dev - Backend
