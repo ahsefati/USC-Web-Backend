@@ -1,4 +1,4 @@
-import express from "express";
+import express, { query } from "express";
 import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import cors from 'cors';
@@ -6,10 +6,11 @@ import dotenv from 'dotenv'
 import postRoutes from './routes/posts.js'
 import userRoutes from './routes/users.js'
 import toolRoutes from './routes/tools.js'
-import Coins from "./models/coins.js";
+import pointsRoutes from './routes/points.js'
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
+const { db, pgp } = require('./pgdb.cjs');
 
 dotenv.config()
 const app = express();
@@ -25,6 +26,30 @@ app.get('/', (req, res) => {
 app.use('/posts', postRoutes)
 app.use('/users', userRoutes)
 app.use('/tools', toolRoutes)
+app.use('/points', pointsRoutes)
+
+app.get('/api/points', async (req, res) => {
+        try {
+                // const query_str = "SELECT * FROM points WHERE ST_Within(geom, ST_MakeEnvelope(39.984, 116.318, 39.9847, 116.319, 4326))"
+                const query_str = `
+                SELECT
+pointid,
+userid,
+ST_X(geom::geometry) AS longitude,
+ST_Y(geom::geometry) AS latitude,
+timestamp
+FROM
+points
+WHERE
+ST_Within(geom, ST_MakeEnvelope(37.75, -122.39, 37.752, -122.392, 4326));  
+                `
+                const points = await db.any(query_str);
+                console.log("I have it now!")
+                res.json(points);
+        } catch (error) {
+                console.error(error);
+                res.status(500).json({ error: 'Internal Server Error' });
+}});
 
 const CONNECTION_URL = process.env.CONNECTION_URL
 const PORT = process.env.PORT || 5000;
@@ -33,40 +58,4 @@ mongoose.set('strictQuery', false)
 mongoose.connect( CONNECTION_URL, {useNewUrlParser: true, useUnifiedTopology: true})
         .then(()=> app.listen(PORT, () => console.log("Server is running.")))
         .catch((err) => console.log(err.message))
-
-
-const updateCoinsDB = () => {
-        const sdk = require('api')('@coinstatsopenapi/v1.0#8fc3kgx93i1locyjj6r');
-        sdk.auth('YcvhJI87P+Q3tB2kz/QpOM1rgp38azdun8RRdh/P7lY=');
-        sdk.coinController_coinList({limit: '8'})
-        .then(({ data }) => {
-                data.result.forEach(coin => {
-                const updateData = {
-                        price: coin.price,
-                        priceChange1h: coin.priceChange1h,
-                        priceChange1d: coin.priceChange1d,
-                        priceChange1w: coin.priceChange1w,
-                        volume: coin.volume,
-                        marketCap: coin.marketCap,
-                        supply: coin.availableSupply,
-                        lastupdated: new Date() // Current date and time
-                };
-
-                // Save to MongoDB
-                Coins.findOneAndUpdate(
-                        { id: coin.id }, // Search criterion
-                        updateData, // Data to update
-                        { upsert: true, new: true }, // Options: upsert and return new document
-                        (err, doc) => {
-                                if (err) {
-                                        console.error('Error updating coin in database:', err);
-                                }
-                        }
-                );
-                });
-        })
-        .catch(err => console.error(err));
-}
-
-setInterval(updateCoinsDB, 2000);
     
