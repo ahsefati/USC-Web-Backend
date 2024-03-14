@@ -81,7 +81,43 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             ;
         `
         const points = await db.any(query_str)
+        res.status(200).send(points)
+    } catch (error) {
+        console.log(error)
+    }
+}
 
+
+
+export const getPointsInATimeRangeWithFilter = async (req, res) => {
+    try {
+        const { start_time, end_time, username } = req.body
+        let usernameSelector;
+        if (username!==undefined){
+            usernameSelector = `AND u."username" = '${username}'`
+        }else{
+            usernameSelector = ``
+        }
+
+        const query_str = `
+            SELECT
+            p.pointid,
+            u."username",
+            ST_X(p.geom::geometry) AS longitude,
+            ST_Y(p.geom::geometry) AS latitude,
+            to_timestamp(p.timestamp) AT TIME ZONE 'UTC' AS datetime,
+            p.metadata,
+            u."sourceId"
+            FROM
+                points p
+            JOIN
+                users u ON p.userId = u."userId"
+            WHERE
+                p.timestamp >= ${start_time} AND p.timestamp <= ${end_time}
+                ${usernameSelector}
+            `
+        const points = await db.any(query_str)
+        console.log(points)
         res.status(200).send(points)
     } catch (error) {
         console.log(error)

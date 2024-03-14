@@ -28,29 +28,6 @@ app.use('/users', userRoutes)
 app.use('/tools', toolRoutes)
 app.use('/points', pointsRoutes)
 
-app.get('/api/points', async (req, res) => {
-        try {
-                // const query_str = "SELECT * FROM points WHERE ST_Within(geom, ST_MakeEnvelope(39.984, 116.318, 39.9847, 116.319, 4326))"
-                const query_str = `
-                SELECT
-pointid,
-userid,
-ST_X(geom::geometry) AS longitude,
-ST_Y(geom::geometry) AS latitude,
-timestamp
-FROM
-points
-WHERE
-ST_Within(geom, ST_MakeEnvelope(37.75, -122.39, 37.752, -122.392, 4326));  
-                `
-                const points = await db.any(query_str);
-                console.log("I have it now!")
-                res.json(points);
-        } catch (error) {
-                console.error(error);
-                res.status(500).json({ error: 'Internal Server Error' });
-}});
-
 const CONNECTION_URL = process.env.CONNECTION_URL
 const PORT = process.env.PORT || 5000;
 
