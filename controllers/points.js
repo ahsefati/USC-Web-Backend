@@ -43,23 +43,56 @@ export const getPointsInABox = async (req, res) => {
 
 export const getPointsInABoxWithFilters = async (req, res) => {
     try {
-        const { min_lat, min_lon, max_lat, max_lon, username, sourceId } = req.body
+        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time } = req.body
         
-        let usernameSelector;
+        // Defining the box selector query
+        let minLat = -90
+        let minLon = -180
+        let maxLat = 90
+        let maxLon = 180
+        if (min_lat!==undefined){
+            minLat = min_lat
+        }
+        if (min_lon!==undefined){
+            minLon = min_lon
+        }
+        if (max_lat!==undefined){
+            maxLat = max_lat
+        }
+        if (max_lon!==undefined){
+            maxLon = max_lon
+        }
+        let boxSelector = `ST_Within(p.geom, ST_MakeEnvelope(${minLat}, ${minLon}, ${maxLat}, ${maxLon}, 4326))`
+
+        // Define the time range selector
+        let startTime = 0
+        let endTime = new Date().getTime()
+        if (start_time!==undefined){
+            startTime = start_time
+        }
+        if (end_time!==undefined){
+            endTime = end_time
+        }
+        let timerangeSelector = `AND p.timestamp >= ${startTime} AND p.timestamp <= ${endTime}`
+
+        // Define username selector
+        let usernameSelector = ``
         if (username!==undefined){
             usernameSelector = `AND u."username" = '${username}'`
         }else{
             usernameSelector = ``
         }
 
-        let sourceSelector;
+        // Define source selector
+        let sourceSelector
         if (sourceId!==undefined){
             sourceSelector = `AND u."sourceId" = '${sourceId}'`
         }else{
             sourceSelector = ``
         }
 
-        const query_str = `
+        const query_str_main = `
+        CREATE MATERIALIZED VIEW my_cached_query AS
             SELECT
             p.pointid,
             u."username",
@@ -75,13 +108,55 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             JOIN
                 sources s ON u."sourceId" = s."sourceId"
             WHERE
-                ST_Within(p.geom, ST_MakeEnvelope(${min_lat}, ${min_lon}, ${max_lat}, ${max_lon}, 4326))
+                ${boxSelector}
+                ${timerangeSelector}
                 ${sourceSelector}
                 ${usernameSelector}
             ;
         `
-        const points = await db.any(query_str)
-        res.status(200).send(points)
+        await db.any(query_str_main)
+
+        
+        const query_str_points = `
+        Select * FROM my_cached_query;
+        `
+        const points = await db.any(query_str_points)
+        
+        const query_str_user_stats = `
+        SELECT
+            "username",
+            COUNT(*) AS pointsCount,
+            MIN(datetime) AS minTime,
+            MAX(datetime) AS maxTime,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY latitude) AS medianLatitude,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY longitude) AS medianLongitude
+        FROM
+            my_cached_query
+        GROUP BY
+            "username";
+        `
+        const user_stats = await db.any(query_str_user_stats)
+
+        const query_str_general_stats = `
+        SELECT
+            MIN(latitude) AS minLatitude,
+            MAX(latitude) AS maxLatitude,
+            MIN(longitude) AS minLongitude,
+            MAX(longitude) AS maxLongitude
+        FROM
+            my_cached_query;
+        `
+
+        const general_stats = await db.any(query_str_general_stats)
+
+
+        const drop_query = `
+            DROP MATERIALIZED VIEW IF EXISTS my_cached_query;
+        `
+        await db.any(drop_query)
+
+
+        res.status(200).send({points: points, user_stats: user_stats, general_stats: general_stats[0]})
     } catch (error) {
         console.log(error)
     }
@@ -117,7 +192,7 @@ export const getPointsInATimeRangeWithFilter = async (req, res) => {
                 ${usernameSelector}
             `
         const points = await db.any(query_str)
-        console.log(points)
+
         res.status(200).send(points)
     } catch (error) {
         console.log(error)
