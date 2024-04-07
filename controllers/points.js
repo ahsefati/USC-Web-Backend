@@ -43,6 +43,11 @@ export const getPointsInABox = async (req, res) => {
 
 export const getPointsInABoxWithFilters = async (req, res) => {
     try {
+        const drop_query = `
+            DROP MATERIALIZED VIEW IF EXISTS my_cached_query;
+        `
+        await db.any(drop_query)
+        
         const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time } = req.body
         
         // Defining the box selector query
@@ -148,12 +153,6 @@ export const getPointsInABoxWithFilters = async (req, res) => {
         `
 
         const general_stats = await db.any(query_str_general_stats)
-
-
-        const drop_query = `
-            DROP MATERIALIZED VIEW IF EXISTS my_cached_query;
-        `
-        await db.any(drop_query)
 
 
         res.status(200).send({points: points, user_stats: user_stats, general_stats: general_stats[0]})
