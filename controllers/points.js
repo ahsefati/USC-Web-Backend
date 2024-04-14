@@ -44,11 +44,11 @@ export const getPointsInABox = async (req, res) => {
 export const getPointsInABoxWithFilters = async (req, res) => {
     try {
         const drop_query = `
-            DROP MATERIALIZED VIEW IF EXISTS my_cached_query;
+            DROP MATERIALIZED VIEW IF EXISTS ahs2;
         `
         await db.any(drop_query)
         
-        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time } = req.body
+        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time, points_user_min, points_user_max, polygon_geo } = req.body
         
         // Defining the box selector query
         let minLat = -90
@@ -67,7 +67,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
         if (max_lon!==undefined){
             maxLon = max_lon
         }
-        let boxSelector = `ST_Within(p.geom, ST_MakeEnvelope(${minLat}, ${minLon}, ${maxLat}, ${maxLon}, 4326))`
+        let boxSelector = `ST_Within(p.geom, ST_MakeEnvelope(${minLon}, ${minLat}, ${maxLon}, ${maxLat}, 4326))`
 
         // Define the time range selector
         let startTime = 0
@@ -79,25 +79,27 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             endTime = end_time
         }
         let timerangeSelector = `AND p.timestamp >= ${startTime} AND p.timestamp <= ${endTime}`
-
+        
         // Define username selector
         let usernameSelector = ``
         if (username!==undefined){
             usernameSelector = `AND u."username" = '${username}'`
-        }else{
-            usernameSelector = ``
         }
 
         // Define source selector
-        let sourceSelector
+        let sourceSelector = ''
         if (sourceId!==undefined){
             sourceSelector = `AND u."sourceId" = '${sourceId}'`
-        }else{
-            sourceSelector = ``
         }
 
-        const query_str_main = `
-        CREATE MATERIALIZED VIEW my_cached_query AS
+        // Define Polygon selector
+        let polygonSelector = ''
+        if (polygon_geo!==undefined){
+            polygonSelector = `AND ST_Intersects(p.geom, ST_GeomFromGeoJSON('${JSON.stringify(polygon_geo)}'))`
+        }
+
+        const query_str_directFilters = `
+        CREATE MATERIALIZED VIEW ahs2 AS
             SELECT
             p.pointid,
             u."username",
@@ -117,16 +119,16 @@ export const getPointsInABoxWithFilters = async (req, res) => {
                 ${timerangeSelector}
                 ${sourceSelector}
                 ${usernameSelector}
+                ${polygonSelector}
             ;
         `
-        await db.any(query_str_main)
+        await db.any(query_str_directFilters)
 
-        
         const query_str_points = `
-        Select * FROM my_cached_query;
+        Select * FROM ahs2;
         `
         const points = await db.any(query_str_points)
-        
+
         const query_str_user_stats = `
         SELECT
             "username",
@@ -136,7 +138,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY latitude) AS medianLatitude,
             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY longitude) AS medianLongitude
         FROM
-            my_cached_query
+            ahs2
         GROUP BY
             "username";
         `
@@ -149,7 +151,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             MIN(longitude) AS minLongitude,
             MAX(longitude) AS maxLongitude
         FROM
-            my_cached_query;
+            ahs2;
         `
 
         const general_stats = await db.any(query_str_general_stats)
