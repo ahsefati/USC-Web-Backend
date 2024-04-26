@@ -18,6 +18,22 @@ export const getAllSources = async (req, res) => {
     }
 }
 
+export const getAllUsers = async (req, res) => {
+    try {
+        const query_str = `
+            SELECT 
+                users.*, 
+                sources.name
+            FROM users
+            JOIN sources ON users."sourceId" = sources."sourceId";
+        `
+        const users = await db.any(query_str)
+        res.status(200).send(users)
+    } catch (error) {
+        console.log(error)
+    }
+}
+
 export const getPointsInABox = async (req, res) => {
     try {
         const { min_lat, min_lon, max_lat, max_lon } = req.body
@@ -48,7 +64,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
         `
         await db.any(drop_query)
         
-        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time, points_user_min, points_user_max, polygon_geo } = req.body
+        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time, points_user_min, points_user_max, polygon_geo, state_polygon } = req.body
         
         // Defining the box selector query
         let minLat = -90
@@ -94,7 +110,9 @@ export const getPointsInABoxWithFilters = async (req, res) => {
 
         // Define Polygon selector
         let polygonSelector = ''
-        if (polygon_geo!==undefined){
+        if (state_polygon!==undefined || state_polygon!==-1){
+            polygonSelector = `AND ST_Intersects(p.geom, ST_GeomFromGeoJSON('${JSON.stringify(state_polygon)}'))`
+        }else if (polygon_geo!==undefined){
             polygonSelector = `AND ST_Intersects(p.geom, ST_GeomFromGeoJSON('${JSON.stringify(polygon_geo)}'))`
         }
 

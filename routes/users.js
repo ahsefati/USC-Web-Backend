@@ -15,5 +15,4 @@ router.patch('/updateUserInfo', auth, updateUserInfo)
 router.patch('/changeUserPass', auth, changeUserPass)
 router.patch('/updateUserAvatar', auth, updateUserAvatar)
 router.patch('/saveatool/:id', auth, saveATool)
-
 export default router
