@@ -110,7 +110,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
 
         // Define Polygon selector
         let polygonSelector = ''
-        if (state_polygon!==undefined || state_polygon!==-1){
+        if (state_polygon!==undefined && state_polygon!==-1){
             polygonSelector = `AND ST_Intersects(p.geom, ST_GeomFromGeoJSON('${JSON.stringify(state_polygon)}'))`
         }else if (polygon_geo!==undefined){
             polygonSelector = `AND ST_Intersects(p.geom, ST_GeomFromGeoJSON('${JSON.stringify(polygon_geo)}'))`
@@ -213,6 +213,90 @@ export const getPointsInATimeRangeWithFilter = async (req, res) => {
         const points = await db.any(query_str)
 
         res.status(200).send(points)
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+
+export const getHistogramInfo = async (req, res) => {
+    try {
+        const { mode, precision, limit, sourceId, username } = req.body
+        // Define username selector
+        let usernameSelector = ``
+        if (username!==undefined){
+            usernameSelector = `AND u."username" = '${username}'`
+        }
+
+        // Define source selector
+        let sourceSelector = ``
+        if (sourceId!==undefined){
+            sourceSelector = `AND u."sourceId" = '${sourceId}'`
+        }
+
+        let query_str;
+        if (mode=='time'){
+            query_str = `
+                WITH point_timediffs AS (
+                    SELECT 
+                        userId,
+                        timestamp,
+                        -- Adjust time difference to 1 minute batches
+                        FLOOR((LEAD(timestamp) OVER (PARTITION BY userId ORDER BY timestamp) - timestamp) / ${parseInt(precision)}) * ${parseInt(precision)} AS time_diff_interval
+                    FROM points
+                    JOIN users u ON points.userId = u."userId"
+                    JOIN sources s ON u."sourceId" = s."sourceId"
+                    WHERE 1=1 
+                    ${sourceSelector} 
+                    ${usernameSelector}
+                )
+                SELECT
+                    time_diff_interval AS histo_value,
+                    COUNT(*) AS point_count
+                FROM 
+                    point_timediffs
+                GROUP BY 
+                    time_diff_interval
+                ORDER BY 
+                    COUNT(*) DESC 
+                LIMIT ${parseInt(limit)};
+            `
+        }else {
+            query_str = `
+                WITH point_distances AS (
+                    SELECT 
+                        pointId,
+                        userId,
+                        -- Haversine formula to calculate distance in meters
+                        6371000 * acos(
+                            LEAST(1, GREATEST(-1,
+                                cos(radians(ST_Y(geom))) * cos(radians(ST_Y(LEAD(geom) OVER (PARTITION BY userId ORDER BY timestamp)))) * 
+                                cos(radians(ST_X(LEAD(geom) OVER (PARTITION BY userId ORDER BY timestamp))) - radians(ST_X(geom))) + 
+                                sin(radians(ST_Y(geom))) * sin(radians(ST_Y(LEAD(geom) OVER (PARTITION BY userId ORDER BY timestamp))))
+                            ))
+                        ) AS distance
+                    FROM points
+                    JOIN users u ON points.userId = u."userId"
+                    JOIN sources s ON u."sourceId" = s."sourceId"
+                    WHERE 1=1
+                    ${sourceSelector} 
+                    ${usernameSelector}
+                )
+                SELECT
+                    FLOOR(distance / ${parseInt(precision)}) * ${parseInt(precision)} AS histo_value,
+                    COUNT(*) AS point_count
+                FROM 
+                    point_distances
+                GROUP BY 
+                    histo_value
+                ORDER BY 
+                    COUNT(*) DESC
+                LIMIT ${parseInt(limit)};
+            `
+        }
+
+        const info = await db.any(query_str)
+        res.status(200).send(info)
     } catch (error) {
         console.log(error)
     }
