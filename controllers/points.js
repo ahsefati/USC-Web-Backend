@@ -25,7 +25,8 @@ export const getAllUsers = async (req, res) => {
                 users.*, 
                 sources.name
             FROM users
-            JOIN sources ON users."sourceId" = sources."sourceId";
+            JOIN sources ON users."sourceId" = sources."sourceId"
+            ORDER BY users."userId";
         `
         const users = await db.any(query_str)
         res.status(200).send(users)
@@ -125,7 +126,8 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             ST_Y(p.geom::geometry) AS latitude,
             to_timestamp(p.timestamp) AT TIME ZONE 'UTC' AS datetime,
             u."sourceId",
-            p.metadata
+            p.metadata,
+            p.speed
             FROM
                 points p
             JOIN
@@ -174,7 +176,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
 
         const general_stats = await db.any(query_str_general_stats)
 
-
+        console.log(points)
         res.status(200).send({points: points, user_stats: user_stats, general_stats: general_stats[0]})
     } catch (error) {
         console.log(error)
@@ -258,8 +260,7 @@ export const getHistogramInfo = async (req, res) => {
                 GROUP BY 
                     time_diff_interval
                 ORDER BY 
-                    COUNT(*) DESC 
-                LIMIT ${parseInt(limit)};
+                    COUNT(*) DESC;
             `
         }else {
             query_str = `
@@ -290,8 +291,7 @@ export const getHistogramInfo = async (req, res) => {
                 GROUP BY 
                     histo_value
                 ORDER BY 
-                    COUNT(*) DESC
-                LIMIT ${parseInt(limit)};
+                    COUNT(*) DESC;
             `
         }
 
