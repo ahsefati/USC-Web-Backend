@@ -65,7 +65,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
         `
         await db.any(drop_query)
         
-        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time, points_user_min, points_user_max, polygon_geo, state_polygon } = req.body
+        const { min_lat, min_lon, max_lat, max_lon, username, sourceId, start_time, end_time, max_point_speed, min_point_speed, polygon_geo, state_polygon } = req.body
         
         // Defining the box selector query
         let minLat = -90
@@ -117,6 +117,18 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             polygonSelector = `AND ST_Intersects(p.geom, ST_GeomFromGeoJSON('${JSON.stringify(polygon_geo)}'))`
         }
 
+        // Define Speed Limit selector
+        let min_speed = 0
+        let max_speed = 10**10
+        if (min_point_speed!==undefined ){
+            min_speed = min_point_speed
+        }
+        if (max_point_speed!==undefined){
+            max_speed = max_point_speed
+        }
+        let speedLimitSelector = `AND p.speed >= ${min_speed} AND p.speed <= ${max_speed}`
+
+
         const query_str_directFilters = `
         CREATE MATERIALIZED VIEW ahs2 AS
             SELECT
@@ -140,6 +152,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
                 ${sourceSelector}
                 ${usernameSelector}
                 ${polygonSelector}
+                ${speedLimitSelector}
             ;
         `
         await db.any(query_str_directFilters)
@@ -176,7 +189,6 @@ export const getPointsInABoxWithFilters = async (req, res) => {
 
         const general_stats = await db.any(query_str_general_stats)
 
-        console.log(points)
         res.status(200).send({points: points, user_stats: user_stats, general_stats: general_stats[0]})
     } catch (error) {
         console.log(error)
