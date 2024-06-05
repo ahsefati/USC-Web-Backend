@@ -2,7 +2,6 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url)
 const { db, pgp } = require('../pgdb.cjs')
 
-
 export const getAllSources = async (req, res) => {
     try {
         const query_str = `
@@ -106,7 +105,7 @@ export const getPointsInABoxWithFilters = async (req, res) => {
         // Define source selector
         let sourceSelector = ''
         if (sourceId!==undefined){
-            sourceSelector = `AND u."sourceId" = '${sourceId}'`
+            sourceSelector = `And u."sourceId" = '${sourceId}'`
         }
 
         // Define Polygon selector
@@ -127,7 +126,9 @@ export const getPointsInABoxWithFilters = async (req, res) => {
             max_speed = max_point_speed
         }
         let speedLimitSelector = `AND p.speed >= ${min_speed} AND p.speed <= ${max_speed}`
-
+        if (min_point_speed===undefined && max_point_speed===undefined){
+            speedLimitSelector = ''
+        }
 
         const query_str_directFilters = `
         CREATE MATERIALIZED VIEW ahs2 AS
@@ -148,8 +149,8 @@ export const getPointsInABoxWithFilters = async (req, res) => {
                 sources s ON u."sourceId" = s."sourceId"
             WHERE
                 ${boxSelector}
-                ${timerangeSelector}
                 ${sourceSelector}
+                ${timerangeSelector}
                 ${usernameSelector}
                 ${polygonSelector}
                 ${speedLimitSelector}
