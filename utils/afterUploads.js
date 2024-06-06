@@ -58,8 +58,8 @@ const getNextPointId = async () => {
 export const insertInitToSources = async (datasetName, userName, link) => {
     try {
         const nextSourceId = await getNextSourceId();
-        const query = 'INSERT INTO "sources" ("sourceId", "name", "link") VALUES ($1, $2, $3) RETURNING *';
-        const values = [nextSourceId, `${datasetName}_${userName}`, link];
+        const query = 'INSERT INTO "sources" ("sourceId", "name", "link", "ownerName") VALUES ($1, $2, $3, $4) RETURNING *';
+        const values = [nextSourceId, datasetName, link, userName];
         const result = await db.query(query, values);    
         return result
     }catch (error){
@@ -79,7 +79,7 @@ export const createUsersCSV = async (sourceName, sourceId, uploadedFileName, __d
         .pipe(csv())
         .on('data', (data) => {
             data = trimObjectKeys(data)
-            const uniqueUserKey = `${sourceName}_${data.username}`;
+            const uniqueUserKey = `${data.username}`;
             if (!uniqueUsers.has(uniqueUserKey)) {
             uniqueUsers.set(uniqueUserKey, {
                 userId: nextUserId++,
@@ -144,7 +144,7 @@ export const createPointsCSV = async (rows, sourceName, uploadedFileName, __dirn
         .pipe(csv())
         .on('data', (data) => {
             data = trimObjectKeys(data)
-            const uniqueUserKey = `${sourceName}_${data.username}`;
+            const uniqueUserKey = `${data.username}`;
             if (usernameToUserId.has(uniqueUserKey)) {
             processedRows.push({
                 pointId: nextPointId++,
